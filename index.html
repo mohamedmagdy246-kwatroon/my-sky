@@ -178,7 +178,7 @@ function effect(kind,index=0){
 toggle.addEventListener('click',e=>{e.stopPropagation();if(playing)stop();else start()});
 document.querySelectorAll('.point').forEach(el=>el.addEventListener('click',()=>{
  if(!started){start().then(()=>effect('star',Number(el.dataset.n)||0))}else effect('star',Number(el.dataset.n)||0);
- if(document.querySelectorAll('.point.done').length===4){setTimeout(()=>effect('meteor'),300)}
+ if(document.querySelectorAll('.point.done').length===5){setTimeout(()=>effect('meteor'),300)}
 }));
 const moon=document.getElementById('moon-open');if(moon)moon.addEventListener('click',()=>{if(!started)start().then(()=>effect('moon'));else effect('moon')});
 const wish=document.getElementById('wish-star');if(wish)wish.addEventListener('click',()=>effect('star',4));
