@@ -117,72 +117,69 @@ seen.add(i);b.classList.add('done');b.setAttribute('aria-pressed','true');docume
 })();
 </script>
 <style id="sky-audio-style">
-#sky-audio-toggle{position:fixed;left:16px;bottom:18px;z-index:2147483000;border:1px solid rgba(230,222,255,.35);border-radius:999px;background:rgba(20,19,45,.66);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff3dc;font:500 13px system-ui,sans-serif;letter-spacing:0;padding:10px 14px;cursor:pointer;box-shadow:0 4px 22px rgba(0,0,0,.2);direction:rtl;transition:opacity .2s,background .2s}
-#sky-audio-toggle:hover{background:rgba(49,38,86,.85)}#sky-audio-toggle:focus-visible{outline:2px solid #ffe5b7;outline-offset:3px}
-@media(prefers-reduced-motion:reduce){#sky-audio-toggle{transition:none}}
+#sky-audio-toggle{position:fixed;left:16px;bottom:18px;z-index:2147483000;border:1px solid rgba(230,222,255,.35);border-radius:999px;background:rgba(20,19,45,.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff3dc;font:500 13px system-ui,sans-serif;padding:10px 14px;cursor:pointer;box-shadow:0 4px 22px rgba(0,0,0,.2);direction:rtl}#sky-audio-toggle:focus-visible{outline:2px solid #ffe5b7;outline-offset:3px}
 </style>
-<button id="sky-audio-toggle" type="button" aria-label="تشغيل الموسيقى" aria-pressed="false" title="تشغيل أو إيقاف الموسيقى">♫ تشغيل الموسيقى</button>
+<button id="sky-audio-toggle" type="button" aria-label="تشغيل الموسيقى" aria-pressed="false">♫ تشغيل الموسيقى</button>
+<audio id="sky-ambient-track" loop preload="auto" playsinline></audio>
 <script id="sky-original-audio">
 (function(){
 'use strict';
-const toggle=document.getElementById('sky-audio-toggle');
-const AudioCtx=window.AudioContext||window.webkitAudioContext;
-let ctx=null,master=null,musicGain=null,fxGain=null,playing=false,started=false,loopTimer=null,step=0;
-const chords=[[261.63,329.63,392,493.88],[220,261.63,329.63,392],[174.61,220,261.63,349.23],[196,246.94,293.66,392]];
-function setup(){
- if(!AudioCtx)return false;
+const btn=document.getElementById('sky-audio-toggle'),audio=document.getElementById('sky-ambient-track');
+let enabled=false,ctx=null,fxGain=null,unlocked=false;
+const notes=[523.25,587.33,659.25,783.99,880];
+function buildMusic(){
+ const rate=22050,seconds=16,count=rate*seconds,pcm=new Int16Array(count);
+ const chords=[[261.63,329.63,392],[220,261.63,329.63],[174.61,220,349.23],[196,246.94,293.66]];
+ const melody=[0,2,1,2,0,1,2,1];
+ for(let i=0;i<count;i++){
+  const t=i/rate,bar=Math.floor(t/4)%4,phase=t%4,ch=chords[bar];
+  let v=0;
+  for(let k=0;k<3;k++){const f=ch[k]/2;v+=.055*Math.sin(2*Math.PI*f*t)*(0.76+0.24*Math.sin(Math.PI*phase/4));}
+  const beat=Math.floor(phase/.5),pos=phase%0.5,frequency=ch[melody[beat]%3]*(beat===3?2:1);
+  const env=Math.exp(-pos*6.8);
+  v+=.21*env*(Math.sin(2*Math.PI*frequency*t)+.17*Math.sin(2*Math.PI*frequency*2*t));
+  v+=.055*Math.sin(2*Math.PI*ch[0]*t)*Math.sin(Math.PI*phase/4);
+  const fade=Math.min(1,t/.4,(seconds-t)/.4);
+  pcm[i]=Math.max(-32767,Math.min(32767,Math.round(v*Math.max(0,fade)*32767)));
+ }
+ const buffer=new ArrayBuffer(44+pcm.length*2),view=new DataView(buffer);
+ function str(at,value){for(let i=0;i<value.length;i++)view.setUint8(at+i,value.charCodeAt(i))}
+ str(0,'RIFF');view.setUint32(4,36+pcm.length*2,true);str(8,'WAVE');str(12,'fmt ');
+ view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+ view.setUint32(24,rate,true);view.setUint32(28,rate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);
+ str(36,'data');view.setUint32(40,pcm.length*2,true);
+ for(let i=0;i<pcm.length;i++)view.setInt16(44+i*2,pcm[i],true);
+ audio.src=URL.createObjectURL(new Blob([buffer],{type:'audio/wav'}));audio.volume=.8;
+}
+try{buildMusic()}catch(e){btn.textContent='تعذر تجهيز الموسيقى'}
+function update(){btn.textContent=enabled?'♫ إيقاف الموسيقى':'♫ تشغيل الموسيقى';btn.setAttribute('aria-pressed',String(enabled));btn.setAttribute('aria-label',enabled?'إيقاف الموسيقى':'تشغيل الموسيقى')}
+function start(){
+ if(enabled)return;
+ enabled=true;update();
+ const p=audio.play();
+ if(p&&p.catch)p.catch(()=>{enabled=false;update();btn.textContent='♫ اضغط لتشغيل الصوت'});
+}
+function stop(){enabled=false;audio.pause();update()}
+btn.addEventListener('click',function(e){e.stopPropagation();if(enabled)stop();else start()});
+document.addEventListener('pointerdown',function(e){if(!unlocked&&e.target!==btn&&!btn.contains(e.target)){unlocked=true;start()}},{capture:true,passive:true});
+document.addEventListener('keydown',function(e){if(!unlocked&&(e.key==='Enter'||e.key===' ')){unlocked=true;start()}},{capture:true});
+function initFX(){
  if(ctx)return true;
- try{
- ctx=new AudioCtx();master=ctx.createGain();master.gain.value=.9;master.connect(ctx.destination);
- musicGain=ctx.createGain();musicGain.gain.value=.65;musicGain.connect(master);
- fxGain=ctx.createGain();fxGain.gain.value=.75;fxGain.connect(master);
- return true;
- }catch(e){return false}
+ try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return false;ctx=new C();fxGain=ctx.createGain();fxGain.gain.value=.4;fxGain.connect(ctx.destination);return true}catch(e){return false}
 }
-function tone(freq,at,duration,volume,destination,wave='sine'){
- if(!ctx)return;
- const osc=ctx.createOscillator(),env=ctx.createGain();
- osc.type=wave;osc.frequency.setValueAtTime(freq,at);
- env.gain.setValueAtTime(.0001,at);env.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),at+.035);
- env.gain.exponentialRampToValueAtTime(.0001,at+duration);
- osc.connect(env);env.connect(destination);osc.start(at);osc.stop(at+duration+.03);
+function ping(f,delay=0,duration=.6){
+ if(!initFX())return;
+ if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+ const t=ctx.currentTime+delay,osc=ctx.createOscillator(),g=ctx.createGain();
+ osc.type='sine';osc.frequency.value=f;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.35,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+duration);
+ osc.connect(g);g.connect(fxGain);osc.start(t);osc.stop(t+duration+.02);
 }
-function playMeasure(){
- if(!playing||!ctx)return;
- const chord=chords[step%chords.length],now=ctx.currentTime+.03;
- tone(chord[0]/2,now,2.7,.14,musicGain);
- tone(chord[0],now,2.9,.075,musicGain);
- tone(chord[2],now+.08,2.6,.05,musicGain);
- const pattern=[0,2,1,3,2,1,0,2];
- pattern.forEach((n,i)=>tone(chord[n]*(i===3?2:1),now+i*.38,.7,.09,musicGain));
- step++;loopTimer=setTimeout(playMeasure,3040);
-}
-async function start(){
- if(!setup()){toggle.textContent='الصوت غير مدعوم';toggle.disabled=true;return}
- try{const resuming=ctx.resume();if(ctx.state==='suspended')await resuming}catch(e){toggle.textContent='اضغط لتشغيل الصوت';return}
- if(ctx.state!=='running')return;
- if(!playing){playing=true;started=true;toggle.textContent='♫ إيقاف الموسيقى';toggle.setAttribute('aria-label','إيقاف الموسيقى');toggle.setAttribute('aria-pressed','true');playMeasure()}
-}
-function stop(){
- playing=false;clearTimeout(loopTimer);loopTimer=null;
- if(ctx&&ctx.state==='running')ctx.suspend().catch(()=>{});
- toggle.textContent='♫ تشغيل الموسيقى';toggle.setAttribute('aria-label','تشغيل الموسيقى');toggle.setAttribute('aria-pressed','false');
-}
-function effect(kind,index=0){
- if(!playing||!ctx)return;
- const t=ctx.currentTime+.01;
- if(kind==='star'){const notes=[523.25,587.33,659.25,783.99,880];tone(notes[index%5],t,.65,.24,fxGain);tone(notes[index%5]*1.5,t+.11,.8,.1,fxGain)}
- if(kind==='meteor'){[880,783.99,659.25,523.25,392].forEach((n,i)=>tone(n,t+i*.13,.65,.12,fxGain))}
- if(kind==='moon'){[392,493.88,587.33,783.99].forEach((n,i)=>tone(n,t+i*.23,1.5,.16,fxGain))}
-}
-toggle.addEventListener('click',e=>{e.stopPropagation();if(playing)stop();else start()});
-document.addEventListener('pointerdown',function unlock(e){if(toggle.contains(e.target))return;if(!started){start()}},{capture:true,passive:true});
 document.querySelectorAll('.point').forEach(el=>el.addEventListener('click',()=>{
- if(!started){start().then(()=>effect('star',Number(el.dataset.n)||0))}else effect('star',Number(el.dataset.n)||0);
- if(document.querySelectorAll('.point.done').length===5){setTimeout(()=>effect('meteor'),300)}
+ const n=Number(el.dataset.n)||0;ping(notes[n%5]);ping(notes[n%5]*1.5,.1,.8);
+ if(document.querySelectorAll('.point.done').length===5){[880,784,659,523,392].forEach((f,i)=>ping(f,.35+i*.14,.65))}
 }));
-const moon=document.getElementById('moon-open');if(moon)moon.addEventListener('click',()=>{if(!started)start().then(()=>effect('moon'));else effect('moon')});
-const wish=document.getElementById('wish-star');if(wish)wish.addEventListener('click',()=>effect('star',4));
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)stop()});
+const moon=document.getElementById('moon-open');
+if(moon)moon.addEventListener('click',()=>[392,494,587,784].forEach((f,i)=>ping(f,i*.2,1.3)));
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&enabled)stop()});
 })();
 </script></body></html>
