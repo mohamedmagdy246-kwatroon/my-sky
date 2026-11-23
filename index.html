@@ -128,18 +128,31 @@ const btn=document.getElementById('sky-audio-toggle'),audio=document.getElementB
 let enabled=false,ctx=null,fxGain=null,unlocked=false;
 const notes=[523.25,587.33,659.25,783.99,880];
 function buildMusic(){
- const rate=22050,seconds=16,count=rate*seconds,pcm=new Int16Array(count);
- const chords=[[261.63,329.63,392],[220,261.63,329.63],[174.61,220,349.23],[196,246.94,293.66]];
- const melody=[0,2,1,2,0,1,2,1];
+ // Original 24-second piano-and-soft-rain ambience, synthesized locally.
+ const rate=22050,seconds=24,count=rate*seconds,pcm=new Int16Array(count);
+ const chords=[[261.63,329.63,392,493.88],[220,261.63,329.63,440],[174.61,220,261.63,349.23],[196,246.94,293.66,392]];
+ const melody=[0,2,1,3,2,1,0,2],twoPi=2*Math.PI;
+ let seed=271828,low=0,mid=0;
+ const noise=()=>{seed=(Math.imul(1664525,seed)+1013904223)>>>0;return seed/2147483648-1};
+ const rain=new Float32Array(count);
  for(let i=0;i<count;i++){
-  const t=i/rate,bar=Math.floor(t/4)%4,phase=t%4,ch=chords[bar];
+  const white=noise();
+  low+=.025*(white-low);mid+=.17*(white-mid);
+  rain[i]=.045*(mid-low)+.016*white;
+ }
+ for(let i=0;i<count;i++){
+  const t=i/rate,bar=Math.floor(t/6)%4,phase=t%6,ch=chords[bar];
   let v=0;
-  for(let k=0;k<3;k++){const f=ch[k]/2;v+=.055*Math.sin(2*Math.PI*f*t)*(0.76+0.24*Math.sin(Math.PI*phase/4));}
-  const beat=Math.floor(phase/.5),pos=phase%0.5,frequency=ch[melody[beat]%3]*(beat===3?2:1);
-  const env=Math.exp(-pos*6.8);
-  v+=.21*env*(Math.sin(2*Math.PI*frequency*t)+.17*Math.sin(2*Math.PI*frequency*2*t));
-  v+=.055*Math.sin(2*Math.PI*ch[0]*t)*Math.sin(Math.PI*phase/4);
-  const fade=Math.min(1,t/.4,(seconds-t)/.4);
+  // Soft sustained string-like pads behind the melody.
+  for(let k=0;k<3;k++)v+=.028*Math.sin(twoPi*(ch[k]/2)*t)*(0.85+.15*Math.cos(twoPi*phase/6));
+  // Gentle piano notes with a decaying fundamental and subtle overtones.
+  const beat=Math.floor(phase/.75),pos=phase%.75,f=ch[melody[beat]%4]*(beat===3?2:1);
+  const env=Math.exp(-pos*4.5);
+  v+=.15*env*(Math.sin(twoPi*f*t)+.12*Math.sin(twoPi*f*2*t));
+  // Quiet continuous rain, with a soft distant airy wash.
+  v+=rain[i]+.012*Math.sin(twoPi*82*t);
+  // Fade in/out to avoid sharp loop clicks.
+  const fade=Math.min(1,t/1.2,(seconds-t)/1.2);
   pcm[i]=Math.max(-32767,Math.min(32767,Math.round(v*Math.max(0,fade)*32767)));
  }
  const buffer=new ArrayBuffer(44+pcm.length*2),view=new DataView(buffer);
@@ -149,7 +162,7 @@ function buildMusic(){
  view.setUint32(24,rate,true);view.setUint32(28,rate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);
  str(36,'data');view.setUint32(40,pcm.length*2,true);
  for(let i=0;i<pcm.length;i++)view.setInt16(44+i*2,pcm[i],true);
- audio.src=URL.createObjectURL(new Blob([buffer],{type:'audio/wav'}));audio.volume=.8;
+ audio.src=URL.createObjectURL(new Blob([buffer],{type:'audio/wav'}));audio.volume=.85;
 }
 try{buildMusic()}catch(e){btn.textContent='تعذر تجهيز الموسيقى'}
 function update(){btn.textContent=enabled?'♫ إيقاف الموسيقى':'♫ تشغيل الموسيقى';btn.setAttribute('aria-pressed',String(enabled));btn.setAttribute('aria-label',enabled?'إيقاف الموسيقى':'تشغيل الموسيقى')}
