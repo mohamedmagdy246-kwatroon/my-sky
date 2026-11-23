@@ -138,7 +138,7 @@ function beginRain(){
   const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
   if(!ctx){ctx=new C();fxGain=ctx.createGain();fxGain.gain.value=.4;fxGain.connect(ctx.destination)}
   if(ctx.state==='suspended')ctx.resume().catch(()=>{});
-  if(rainSource){rainGain.gain.setTargetAtTime(.014,ctx.currentTime,.8);return}
+  if(rainSource){rainGain.gain.setTargetAtTime(.042,ctx.currentTime,.8);return}
   const rate=ctx.sampleRate,seconds=12,buffer=ctx.createBuffer(1,rate*seconds,rate),data=buffer.getChannelData(0);
   let seed=49821,low=0,mid=0;
   const random=()=>{seed=(Math.imul(1664525,seed)+1013904223)>>>0;return seed/2147483648-1};
@@ -160,7 +160,7 @@ function beginRain(){
   const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=1200;
   rainGain=ctx.createGain();rainGain.gain.value=0;
   rainSource.connect(filter);filter.connect(rainGain);rainGain.connect(ctx.destination);
-  rainSource.start();rainGain.gain.setTargetAtTime(.014,ctx.currentTime,.8);
+  rainSource.start();rainGain.gain.setTargetAtTime(.042,ctx.currentTime,.8);
  }catch(e){/* music still works if rain is unsupported */}
 }
 function endRain(){if(rainGain&&ctx)rainGain.gain.setTargetAtTime(0,ctx.currentTime,.2)}
