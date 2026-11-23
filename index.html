@@ -133,14 +133,14 @@ function setup(){
  if(!AudioCtx)return false;
  if(ctx)return true;
  try{
- ctx=new AudioCtx();master=ctx.createGain();master.gain.value=.65;master.connect(ctx.destination);
- musicGain=ctx.createGain();musicGain.gain.value=.24;musicGain.connect(master);
- fxGain=ctx.createGain();fxGain.gain.value=.3;fxGain.connect(master);
+ ctx=new AudioCtx();master=ctx.createGain();master.gain.value=.9;master.connect(ctx.destination);
+ musicGain=ctx.createGain();musicGain.gain.value=.65;musicGain.connect(master);
+ fxGain=ctx.createGain();fxGain.gain.value=.75;fxGain.connect(master);
  return true;
  }catch(e){return false}
 }
 function tone(freq,at,duration,volume,destination,wave='sine'){
- if(!ctx||ctx.state!=='running')return;
+ if(!ctx)return;
  const osc=ctx.createOscillator(),env=ctx.createGain();
  osc.type=wave;osc.frequency.setValueAtTime(freq,at);
  env.gain.setValueAtTime(.0001,at);env.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),at+.035);
@@ -148,7 +148,7 @@ function tone(freq,at,duration,volume,destination,wave='sine'){
  osc.connect(env);env.connect(destination);osc.start(at);osc.stop(at+duration+.03);
 }
 function playMeasure(){
- if(!playing||!ctx||ctx.state!=='running')return;
+ if(!playing||!ctx)return;
  const chord=chords[step%chords.length],now=ctx.currentTime+.03;
  tone(chord[0]/2,now,2.7,.14,musicGain);
  tone(chord[0],now,2.9,.075,musicGain);
@@ -159,7 +159,7 @@ function playMeasure(){
 }
 async function start(){
  if(!setup()){toggle.textContent='الصوت غير مدعوم';toggle.disabled=true;return}
- try{await ctx.resume()}catch(e){return}
+ try{const resuming=ctx.resume();if(ctx.state==='suspended')await resuming}catch(e){toggle.textContent='اضغط لتشغيل الصوت';return}
  if(ctx.state!=='running')return;
  if(!playing){playing=true;started=true;toggle.textContent='♫ إيقاف الموسيقى';toggle.setAttribute('aria-label','إيقاف الموسيقى');toggle.setAttribute('aria-pressed','true');playMeasure()}
 }
@@ -169,13 +169,14 @@ function stop(){
  toggle.textContent='♫ تشغيل الموسيقى';toggle.setAttribute('aria-label','تشغيل الموسيقى');toggle.setAttribute('aria-pressed','false');
 }
 function effect(kind,index=0){
- if(!playing||!ctx||ctx.state!=='running')return;
+ if(!playing||!ctx)return;
  const t=ctx.currentTime+.01;
  if(kind==='star'){const notes=[523.25,587.33,659.25,783.99,880];tone(notes[index%5],t,.65,.24,fxGain);tone(notes[index%5]*1.5,t+.11,.8,.1,fxGain)}
  if(kind==='meteor'){[880,783.99,659.25,523.25,392].forEach((n,i)=>tone(n,t+i*.13,.65,.12,fxGain))}
  if(kind==='moon'){[392,493.88,587.33,783.99].forEach((n,i)=>tone(n,t+i*.23,1.5,.16,fxGain))}
 }
 toggle.addEventListener('click',e=>{e.stopPropagation();if(playing)stop();else start()});
+document.addEventListener('pointerdown',function unlock(e){if(toggle.contains(e.target))return;if(!started){start()}},{capture:true,passive:true});
 document.querySelectorAll('.point').forEach(el=>el.addEventListener('click',()=>{
  if(!started){start().then(()=>effect('star',Number(el.dataset.n)||0))}else effect('star',Number(el.dataset.n)||0);
  if(document.querySelectorAll('.point.done').length===5){setTimeout(()=>effect('meteor'),300)}
