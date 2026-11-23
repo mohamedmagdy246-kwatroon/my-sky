@@ -138,13 +138,13 @@ function beginRain(){
   const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
   if(!ctx){ctx=new C();fxGain=ctx.createGain();fxGain.gain.value=.4;fxGain.connect(ctx.destination)}
   if(ctx.state==='suspended')ctx.resume().catch(()=>{});
-  if(rainSource){rainGain.gain.setTargetAtTime(.042,ctx.currentTime,.8);return}
+  if(rainSource){rainGain.gain.setTargetAtTime(.38,ctx.currentTime,.8);return}
   const rate=ctx.sampleRate,seconds=12,buffer=ctx.createBuffer(1,rate*seconds,rate),data=buffer.getChannelData(0);
   let seed=49821,low=0,mid=0;
   const random=()=>{seed=(Math.imul(1664525,seed)+1013904223)>>>0;return seed/2147483648-1};
   for(let i=0;i<data.length;i++){
    const n=random();low+=.008*(n-low);mid+=.065*(n-mid);
-   data[i]=(mid-low)*.34;
+   data[i]=(mid-low)*.7;
   }
   // Gentle individual droplets, not sharp synthetic tones.
   for(let k=0;k<160;k++){
@@ -157,10 +157,10 @@ function beginRain(){
   const edge=Math.floor(rate*.2);
   for(let j=0;j<edge;j++){const t=j/edge;data[j]=data[j]*t+data[data.length-edge+j]*(1-t)}
   rainSource=ctx.createBufferSource();rainSource.buffer=buffer;rainSource.loop=true;
-  const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=1200;
+  const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=1900;
   rainGain=ctx.createGain();rainGain.gain.value=0;
   rainSource.connect(filter);filter.connect(rainGain);rainGain.connect(ctx.destination);
-  rainSource.start();rainGain.gain.setTargetAtTime(.042,ctx.currentTime,.8);
+  rainSource.start();rainGain.gain.setTargetAtTime(.38,ctx.currentTime,.8);
  }catch(e){/* music still works if rain is unsupported */}
 }
 function endRain(){if(rainGain&&ctx)rainGain.gain.setTargetAtTime(0,ctx.currentTime,.2)}
