@@ -115,4 +115,73 @@ document.querySelectorAll('.star-burst').forEach(el=>el.remove());const rect=b.g
 for(let k=0;k<34;k++){const dot=document.createElement('i');dot.className='star-burst';dot.style.left=(rect.left+rect.width/2)+'px';dot.style.top=(rect.top+rect.height/2)+'px';const angle=k*Math.PI*2/34;const radius=55+Math.random()*155;dot.style.setProperty('--dx',Math.cos(angle)*radius+'px');dot.style.setProperty('--dy',Math.sin(angle)*radius+'px');dot.style.background=['#fff2cb','#a8d9ff','#f4c6f9'][i%3];document.body.appendChild(dot);dot.addEventListener('animationend',()=>dot.remove(),{once:true});setTimeout(()=>dot.remove(),1600)}
 seen.add(i);b.classList.add('done');b.setAttribute('aria-pressed','true');document.getElementById('heading').textContent=data[i][0];document.getElementById('message').textContent=data[i][1];reveal.classList.remove('hide');reveal.classList.remove('reveal');void reveal.offsetWidth;reveal.classList.add('reveal');document.getElementById('progress').textContent=`${ar(seen.size)} من ٥ نجوم`;if(seen.size===5){startWishScene()}else reveal.scrollIntoView({behavior:'smooth',block:'center'})}));document.getElementById('restart').addEventListener('click',()=>{wishTimers.forEach(clearTimeout);wishTimers=[];wishScene.classList.remove('show');document.getElementById('meteor').classList.remove('fly');document.getElementById('wish-star-result').classList.remove('visible');document.getElementById('moon-note').classList.add('hide');document.getElementById('moon-open').setAttribute('aria-expanded','false');document.getElementById('moon-open').classList.remove('lit');document.getElementById('identity').classList.add('hide');seen.clear();document.querySelectorAll('.star-burst').forEach(el=>el.remove());document.getElementById('heart-finale').classList.remove('show');document.getElementById('chapter-sky').classList.remove('active');points.forEach(p=>{p.classList.remove('done');p.removeAttribute('aria-pressed')});reveal.classList.add('hide');ending.classList.add('hide');document.getElementById('progress').textContent='٠ من ٥ نجوم';scrollTo({top:0,behavior:'smooth'})});
 })();
+</script>
+<style id="sky-audio-style">
+#sky-audio-toggle{position:fixed;left:16px;bottom:18px;z-index:2147483000;border:1px solid rgba(230,222,255,.35);border-radius:999px;background:rgba(20,19,45,.66);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff3dc;font:500 13px system-ui,sans-serif;letter-spacing:0;padding:10px 14px;cursor:pointer;box-shadow:0 4px 22px rgba(0,0,0,.2);direction:rtl;transition:opacity .2s,background .2s}
+#sky-audio-toggle:hover{background:rgba(49,38,86,.85)}#sky-audio-toggle:focus-visible{outline:2px solid #ffe5b7;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){#sky-audio-toggle{transition:none}}
+</style>
+<button id="sky-audio-toggle" type="button" aria-label="تشغيل الموسيقى" aria-pressed="false" title="تشغيل أو إيقاف الموسيقى">♫ تشغيل الموسيقى</button>
+<script id="sky-original-audio">
+(function(){
+'use strict';
+const toggle=document.getElementById('sky-audio-toggle');
+const AudioCtx=window.AudioContext||window.webkitAudioContext;
+let ctx=null,master=null,musicGain=null,fxGain=null,playing=false,started=false,loopTimer=null,step=0;
+const chords=[[261.63,329.63,392,493.88],[220,261.63,329.63,392],[174.61,220,261.63,349.23],[196,246.94,293.66,392]];
+function setup(){
+ if(!AudioCtx)return false;
+ if(ctx)return true;
+ try{
+ ctx=new AudioCtx();master=ctx.createGain();master.gain.value=.65;master.connect(ctx.destination);
+ musicGain=ctx.createGain();musicGain.gain.value=.24;musicGain.connect(master);
+ fxGain=ctx.createGain();fxGain.gain.value=.3;fxGain.connect(master);
+ return true;
+ }catch(e){return false}
+}
+function tone(freq,at,duration,volume,destination,wave='sine'){
+ if(!ctx||ctx.state!=='running')return;
+ const osc=ctx.createOscillator(),env=ctx.createGain();
+ osc.type=wave;osc.frequency.setValueAtTime(freq,at);
+ env.gain.setValueAtTime(.0001,at);env.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),at+.035);
+ env.gain.exponentialRampToValueAtTime(.0001,at+duration);
+ osc.connect(env);env.connect(destination);osc.start(at);osc.stop(at+duration+.03);
+}
+function playMeasure(){
+ if(!playing||!ctx||ctx.state!=='running')return;
+ const chord=chords[step%chords.length],now=ctx.currentTime+.03;
+ tone(chord[0]/2,now,2.7,.14,musicGain);
+ tone(chord[0],now,2.9,.075,musicGain);
+ tone(chord[2],now+.08,2.6,.05,musicGain);
+ const pattern=[0,2,1,3,2,1,0,2];
+ pattern.forEach((n,i)=>tone(chord[n]*(i===3?2:1),now+i*.38,.7,.09,musicGain));
+ step++;loopTimer=setTimeout(playMeasure,3040);
+}
+async function start(){
+ if(!setup()){toggle.textContent='الصوت غير مدعوم';toggle.disabled=true;return}
+ try{await ctx.resume()}catch(e){return}
+ if(ctx.state!=='running')return;
+ if(!playing){playing=true;started=true;toggle.textContent='♫ إيقاف الموسيقى';toggle.setAttribute('aria-label','إيقاف الموسيقى');toggle.setAttribute('aria-pressed','true');playMeasure()}
+}
+function stop(){
+ playing=false;clearTimeout(loopTimer);loopTimer=null;
+ if(ctx&&ctx.state==='running')ctx.suspend().catch(()=>{});
+ toggle.textContent='♫ تشغيل الموسيقى';toggle.setAttribute('aria-label','تشغيل الموسيقى');toggle.setAttribute('aria-pressed','false');
+}
+function effect(kind,index=0){
+ if(!playing||!ctx||ctx.state!=='running')return;
+ const t=ctx.currentTime+.01;
+ if(kind==='star'){const notes=[523.25,587.33,659.25,783.99,880];tone(notes[index%5],t,.65,.24,fxGain);tone(notes[index%5]*1.5,t+.11,.8,.1,fxGain)}
+ if(kind==='meteor'){[880,783.99,659.25,523.25,392].forEach((n,i)=>tone(n,t+i*.13,.65,.12,fxGain))}
+ if(kind==='moon'){[392,493.88,587.33,783.99].forEach((n,i)=>tone(n,t+i*.23,1.5,.16,fxGain))}
+}
+toggle.addEventListener('click',e=>{e.stopPropagation();if(playing)stop();else start()});
+document.querySelectorAll('.point').forEach(el=>el.addEventListener('click',()=>{
+ if(!started){start().then(()=>effect('star',Number(el.dataset.n)||0))}else effect('star',Number(el.dataset.n)||0);
+ if(document.querySelectorAll('.point.done').length===4){setTimeout(()=>effect('meteor'),300)}
+}));
+const moon=document.getElementById('moon-open');if(moon)moon.addEventListener('click',()=>{if(!started)start().then(()=>effect('moon'));else effect('moon')});
+const wish=document.getElementById('wish-star');if(wish)wish.addEventListener('click',()=>effect('star',4));
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)stop()});
+})();
 </script></body></html>
